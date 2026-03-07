@@ -44,6 +44,54 @@
   let fieldCounter   = 0;
   let fieldsScanned  = 0;
   let redactedCount  = 0;
+  let destroyed      = false; // set when extension context is invalidated
+
+  /**
+   * Check if the extension context is still alive.
+   * After an extension reload/update, the old content script stays in the page
+   * but chrome.runtime becomes invalid. All chrome API calls will throw.
+   */
+  function isContextAlive() {
+    try {
+      return !destroyed && !!chrome.runtime && !!chrome.runtime.id;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Self-destruct: stop all timers and detach when the context dies */
+  function selfDestruct() {
+    if (destroyed) return;
+    destroyed = true;
+    enabled = false;
+    if (rescanTimer) clearInterval(rescanTimer);
+    rescanTimer = null;
+    for (const state of fieldMap.values()) {
+      clearTimeout(state.timer);
+      clearFieldHighlights(state.element);
+    }
+    fieldMap.clear();
+  }
+
+  /** Safe wrapper for chrome.runtime.sendMessage */
+  function safeSendMessage(msg, callback) {
+    if (!isContextAlive()) { selfDestruct(); return; }
+    try {
+      chrome.runtime.sendMessage(msg, (response) => {
+        if (chrome.runtime.lastError) { /* ignore */ }
+        if (callback) callback(response);
+      });
+    } catch {
+      selfDestruct();
+    }
+  }
+
+  /** Redact a numeric string keeping only the last N digits visible */
+  function redactKeepLastNDigits(raw, n = 2) {
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length <= n) return digits;
+    return 'x'.repeat(digits.length - n) + digits.slice(-n);
+  }
 
   // Map<fieldId, { element, findings[], timer }>
   const fieldMap = new Map();
@@ -189,13 +237,13 @@
       // Credit cards
       { id: 'VISA', type: 'CREDIT_CARD', label: 'Visa Card Number', category: 'financial', severity: 'HIGH', confidence: 0.95,
         pattern: /\b4[0-9]{3}[\s\-]?[0-9]{4}[\s\-]?[0-9]{4}[\s\-]?[0-9]{4}\b/g,
-        validate: m => luhnCheck(m), redact: r => { const d = r.replace(/[\s\-]/g,''); return d.slice(0,4)+' **** **** '+d.slice(-4); }},
+        validate: m => luhnCheck(m), redact: r => redactKeepLastNDigits(r, 2) },
       { id: 'MC', type: 'CREDIT_CARD', label: 'Mastercard Number', category: 'financial', severity: 'HIGH', confidence: 0.95,
         pattern: /\b(?:5[1-5][0-9]{2}|222[1-9]|22[3-9][0-9]|2[3-6][0-9]{2}|27[01][0-9]|2720)[\s\-]?[0-9]{4}[\s\-]?[0-9]{4}[\s\-]?[0-9]{4}\b/g,
-        validate: m => luhnCheck(m), redact: r => { const d = r.replace(/[\s\-]/g,''); return d.slice(0,4)+' **** **** '+d.slice(-4); }},
+        validate: m => luhnCheck(m), redact: r => redactKeepLastNDigits(r, 2) },
       { id: 'AMEX', type: 'CREDIT_CARD', label: 'Amex Card Number', category: 'financial', severity: 'HIGH', confidence: 0.95,
         pattern: /\b3[47][0-9]{2}[\s\-]?[0-9]{6}[\s\-]?[0-9]{5}\b/g,
-        validate: m => luhnCheck(m), redact: r => { const d = r.replace(/[\s\-]/g,''); return d.slice(0,4)+' ****** '+d.slice(-5); }},
+        validate: m => luhnCheck(m), redact: r => redactKeepLastNDigits(r, 2) },
 
       // CVV
       { id: 'CVV', type: 'CVV', label: 'CVV / Security Code', category: 'financial', severity: 'HIGH', confidence: 0.85,
@@ -206,13 +254,19 @@
       { id: 'SSN', type: 'SSN', label: 'Social Security Number', category: 'identity', severity: 'CRITICAL', confidence: 0.92,
         pattern: /\b(?!000|666|9\d{2})\d{3}[\s\-]?(?!00)\d{2}[\s\-]?(?!0000)\d{4}\b/g,
         validate: m => { const d = m.replace(/[\s\-]/g, ''); return !['123456789','111111111','222222222','333333333','444444444','555555555','666666666','777777777','888888888','999999999'].includes(d); },
-        redact: r => { const d = r.replace(/[\s\-]/g,''); return '***-**-'+d.slice(-4); }},
+        redact: r => redactKeepLastNDigits(r, 2) },
 
       // Phone US
-      { id: 'PHONE_US', type: 'PHONE_NUMBER', label: 'Phone Number', category: 'contact', severity: 'MEDIUM', confidence: 0.85,
+      { id: 'PHONE_US', type: 'PHONE_NUMBER', label: 'Phone Number (US)', category: 'contact', severity: 'MEDIUM', confidence: 0.85,
         pattern: /\b(?:\+?1[\s.\-]?)?\(?(?:[2-9][0-8][0-9])\)?[\s.\-]?(?:[2-9][0-9]{2})[\s.\-]?(?:[0-9]{4})\b/g,
         validate: m => { const d = m.replace(/\D/g,''); const c = d.startsWith('1')&&d.length===11?d.slice(1):d; return c.length===10; },
-        redact: r => { const d = r.replace(/\D/g,''); return '(***) ***-'+d.slice(-4); }},
+        redact: r => { const d = r.replace(/\D/g,''); return 'x'.repeat(d.length - 2) + d.slice(-2); }},
+
+      // Phone IN (Indian)
+      { id: 'PHONE_IN', type: 'PHONE_NUMBER', label: 'Phone Number (IN)', category: 'contact', severity: 'MEDIUM', confidence: 0.88,
+        pattern: /\b(?:\+?91[\s.\-]?)?[6-9]\d{4}[\s.\-]?\d{5}\b/g,
+        validate: m => { const d = m.replace(/\D/g,''); const c = d.startsWith('91')&&d.length===12?d.slice(2):d; return c.length===10; },
+        redact: r => { const d = r.replace(/\D/g,''); return 'x'.repeat(d.length - 2) + d.slice(-2); }},
 
       // Email
       { id: 'EMAIL', type: 'EMAIL', label: 'Email Address', category: 'contact', severity: 'LOW', confidence: 0.95,
@@ -273,13 +327,13 @@
       { id: 'IBAN', type: 'IBAN', label: 'IBAN Number', category: 'financial', severity: 'HIGH', confidence: 0.92,
         pattern: /\b[A-Z]{2}[0-9]{2}[\s]?(?:[A-Z0-9]{4}[\s]?){1,7}[A-Z0-9]{1,4}\b/g,
         validate: m => { const r = m.replace(/\s/g,''); return r.length >= 15 && r.length <= 34; },
-        redact: r => r.slice(0,4)+' **** **** '+r.slice(-4) },
+        redact: r => redactKeepLastNDigits(r, 2) },
 
       // Aadhaar
       { id: 'AADHAAR', type: 'NATIONAL_ID', label: 'Aadhaar Number', category: 'identity', severity: 'CRITICAL', confidence: 0.88,
         pattern: /\b[2-9]\d{3}[\s\-]?\d{4}[\s\-]?\d{4}\b/g,
         validate: m => m.replace(/[\s\-]/g, '').length === 12,
-        redact: r => { const d = r.replace(/[\s\-]/g,''); return 'XXXX XXXX '+d.slice(-4); }},
+        redact: r => redactKeepLastNDigits(r, 2) },
 
       // Sensitive phrases
       { id: 'CONF_PHRASE', type: 'SENSITIVE_PHRASE', label: 'Confidential Phrase', category: 'context', severity: 'MEDIUM', confidence: 0.88,
@@ -303,12 +357,93 @@
     'textarea',
     '[contenteditable="true"]',
     '[contenteditable=""]',
+    '[contenteditable="plaintext-only"]',
     '[role="textbox"]',
+    '[data-testid*="text"]',       // React test IDs
+    '.ProseMirror',                // ProseMirror editors (Notion, etc.)
+    '.ql-editor',                  // Quill editors
+    '.tox-edit-area__iframe',      // TinyMCE iframe
   ].join(', ');
 
-  function discoverFields() {
-    const elements = document.querySelectorAll(INPUT_SELECTORS);
-    elements.forEach(attachField);
+  /** Check if an element is an editable text field */
+  function isEditableField(el) {
+    if (!el || el.nodeType !== 1) return false;
+    const tag = el.tagName;
+    if (tag === 'TEXTAREA') return true;
+    if (tag === 'INPUT') {
+      const type = (el.getAttribute('type') || 'text').toLowerCase();
+      return ['text','email','search','url','tel','password',''].includes(type);
+    }
+    if (el.isContentEditable) return true;
+    if (el.getAttribute('contenteditable') === 'true' ||
+        el.getAttribute('contenteditable') === '' ||
+        el.getAttribute('contenteditable') === 'plaintext-only') return true;
+    if (el.getAttribute('role') === 'textbox') return true;
+    return false;
+  }
+
+  /**
+   * Walk up from a DOM node to find the nearest editable element.
+   * Handles text nodes, <p>/<span> inside contenteditable, shadow DOM hosts, etc.
+   * Critical for GPT, Claude, Gmail, Notion where composedPath()[0]
+   * is often a child <p>, <span>, or text node inside the actual editable.
+   */
+  function findEditableAncestor(node) {
+    let el = node;
+    while (el && el.nodeType !== 1) {
+      el = el.parentElement || el.parentNode;
+    }
+    if (!el) return null;
+
+    let candidate = null;
+    let cur = el;
+    while (cur && cur !== document.body && cur !== document.documentElement) {
+      if (cur.tagName === 'TEXTAREA' || cur.tagName === 'INPUT') return cur;
+      const ce = cur.getAttribute && cur.getAttribute('contenteditable');
+      if (ce === 'true' || ce === '' || ce === 'plaintext-only') {
+        candidate = cur;
+      }
+      if (cur.getAttribute && cur.getAttribute('role') === 'textbox') {
+        candidate = cur;
+      }
+      cur = cur.parentElement || cur.parentNode;
+    }
+    return candidate || (isEditableField(el) ? el : null);
+  }
+
+  function discoverFields(root) {
+    const searchRoot = root || document;
+    try {
+      const elements = searchRoot.querySelectorAll(INPUT_SELECTORS);
+      elements.forEach(attachField);
+    } catch(e) { /* ignore invalid selectors on some pages */ }
+
+    // Also walk shadow roots
+    walkShadowRoots(searchRoot);
+  }
+
+  /** Recursively walk shadow DOMs to find input fields */
+  function walkShadowRoots(root) {
+    if (!root) return;
+    const els = root.querySelectorAll ? root.querySelectorAll('*') : [];
+    for (const el of els) {
+      if (el.shadowRoot) {
+        discoverFields(el.shadowRoot);
+        observeShadowRoot(el.shadowRoot);
+      }
+    }
+  }
+
+  /** Set up MutationObserver inside a shadow root */
+  const observedShadowRoots = new WeakSet();
+  function observeShadowRoot(shadowRoot) {
+    if (observedShadowRoots.has(shadowRoot)) return;
+    observedShadowRoots.add(shadowRoot);
+
+    const observer = new MutationObserver(() => {
+      discoverFields(shadowRoot);
+    });
+    observer.observe(shadowRoot, { childList: true, subtree: true });
   }
 
   function attachField(el) {
@@ -655,7 +790,7 @@
     // Send to background script for OCR processing
     const reader = new FileReader();
     reader.onload = () => {
-      chrome.runtime.sendMessage({
+      safeSendMessage({
         type: 'PG_SCAN_IMAGE',
         dataUrl: reader.result,
       }, (response) => {
@@ -688,6 +823,11 @@
           shouldDiscover = true;
           break;
         }
+        if (mutation.type === 'attributes' &&
+            (mutation.attributeName === 'contenteditable' || mutation.attributeName === 'role')) {
+          shouldDiscover = true;
+          break;
+        }
       }
       if (shouldDiscover) discoverFields();
     });
@@ -695,50 +835,110 @@
     observer.observe(document.body, {
       childList: true,
       subtree: true,
+      attributes: true,
+      attributeFilter: ['contenteditable', 'role'],
     });
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     DOCUMENT-LEVEL EVENT DELEGATION
+     Catches events from shadow DOM, late-rendered fields, and
+     framework-managed inputs (React, Vue, Angular) that don't
+     trigger standard input events on the element we're watching.
+     ═══════════════════════════════════════════════════════════════ */
+
+  function setupEventDelegation() {
+    const delegateScan = (e) => {
+      if (!enabled) return;
+      const raw = e.composedPath ? e.composedPath()[0] : e.target;
+      const el = findEditableAncestor(raw);
+      if (!el) return;
+
+      if (!el.hasAttribute(ATTR_SCANNED)) {
+        attachField(el);
+      }
+
+      const fieldId = el.getAttribute(ATTR_FIELD_ID);
+      if (fieldId) {
+        const state = fieldMap.get(fieldId);
+        if (state) {
+          clearTimeout(state.timer);
+          state.timer = setTimeout(() => scanField(fieldId), SCAN_DEBOUNCE_MS);
+        }
+      }
+    };
+
+    document.addEventListener('input', delegateScan, { capture: true, passive: true });
+    document.addEventListener('keyup', delegateScan, { capture: true, passive: true });
+
+    document.addEventListener('focusin', (e) => {
+      if (!enabled) return;
+      const raw = e.composedPath ? e.composedPath()[0] : e.target;
+      const el = findEditableAncestor(raw);
+      if (el && !el.hasAttribute(ATTR_SCANNED)) {
+        attachField(el);
+        const text = getFieldText(el);
+        if (text && text.length >= MIN_TEXT_LENGTH) {
+          const fieldId = el.getAttribute(ATTR_FIELD_ID);
+          if (fieldId) setTimeout(() => scanField(fieldId), 100);
+        }
+      }
+    }, { capture: true, passive: true });
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     PERIODIC RE-SCAN (for SPAs — Claude, Gmail, Notion, etc.)
+     ═══════════════════════════════════════════════════════════════ */
+
+  let rescanTimer = null;
+  function startPeriodicRescan() {
+    rescanTimer = setInterval(() => {
+      if (!isContextAlive()) { selfDestruct(); return; }
+      if (!enabled) return;
+      discoverFields();
+    }, 3000);
   }
 
   /* ═══════════════════════════════════════════════════════════════
      MESSAGING (content ↔ popup ↔ background)
      ═══════════════════════════════════════════════════════════════ */
 
-  function broadcastState() {
+  /** Build the current state snapshot */
+  function buildStateSnapshot() {
     const findings = getAllFindings();
-    const eng = getEngine();
-
-    // Compute aggregate score
     let rawScore = 0;
     const weights = { CRITICAL: 70, HIGH: 40, MEDIUM: 20, LOW: 8 };
     for (const f of findings) rawScore += weights[f.severity] || 10;
     const score = Math.min(100, rawScore);
     const riskLevel = score >= 80 ? 'CRITICAL' : score >= 55 ? 'HIGH' : score >= 30 ? 'MEDIUM' : score >= 1 ? 'LOW' : 'NONE';
+    return { score, riskLevel, findings, fieldsScanned, redacted: redactedCount };
+  }
 
-    const data = {
-      score,
-      riskLevel,
-      findings,
-      fieldsScanned,
-      redacted: redactedCount,
-    };
+  function broadcastState() {
+    if (window !== window.top) return;
+    if (!isContextAlive()) { selfDestruct(); return; }
 
-    // Send to popup
-    chrome.runtime.sendMessage({ type: 'PG_STATE_UPDATE', data }).catch(() => {});
+    const data = buildStateSnapshot();
 
-    // Also update badge via background
-    chrome.runtime.sendMessage({
+    safeSendMessage({ type: 'PG_STATE_UPDATE', data });
+    safeSendMessage({
       type: 'PG_UPDATE_BADGE',
-      score,
-      riskLevel,
-      findingsCount: findings.length,
-    }).catch(() => {});
+      score: data.score,
+      riskLevel: data.riskLevel,
+      findingsCount: data.findings.length,
+    });
   }
 
   // Listen for messages from popup
   chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!isContextAlive()) { selfDestruct(); return; }
+    if (window !== window.top) return;
+
     switch (msg.type) {
-      case 'PG_REQUEST_STATE':
-        broadcastState();
+      case 'PG_REQUEST_STATE': {
+        sendResponse(buildStateSnapshot());
         break;
+      }
       case 'PG_TOGGLE':
         enabled = msg.enabled;
         if (!enabled) {
@@ -766,8 +966,11 @@
      ═══════════════════════════════════════════════════════════════ */
 
   async function boot() {
-    // Check if extension is enabled
-    const { pgEnabled = true } = await chrome.storage.local.get('pgEnabled');
+    if (!isContextAlive()) return;
+    let pgEnabled = true;
+    try {
+      ({ pgEnabled = true } = await chrome.storage.local.get('pgEnabled'));
+    } catch { selfDestruct(); return; }
     enabled = pgEnabled;
 
     // Discover existing fields
@@ -775,6 +978,12 @@
 
     // Start observing for dynamically added fields
     observeDOM();
+
+    // Document-level event delegation (catches shadow DOM, late-rendered fields)
+    setupEventDelegation();
+
+    // Periodic re-scan for SPAs (Claude, Gmail, Notion, etc.)
+    startPeriodicRescan();
 
     // Intercept form submissions
     interceptFormSubmits();

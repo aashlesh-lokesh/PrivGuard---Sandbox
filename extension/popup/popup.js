@@ -34,6 +34,19 @@
   let currentFindings = [];
   let redactedCount   = 0;
 
+  // ── Feedback area ───────────────────────────────────────
+  const feedbackArea = document.createElement('div');
+  feedbackArea.id = 'feedbackArea';
+  feedbackArea.style.cssText = 'display:none;padding:6px 10px;margin:6px 12px;border-radius:8px;background:rgba(0,184,148,.15);color:#00b894;font-size:12px;text-align:center;transition:opacity .3s';
+  document.querySelector('.pg-popup-body')?.prepend(feedbackArea);
+
+  function showFeedback(text) {
+    feedbackArea.textContent = text;
+    feedbackArea.style.display = 'block';
+    feedbackArea.style.opacity = '1';
+    setTimeout(() => { feedbackArea.style.opacity = '0'; setTimeout(() => { feedbackArea.style.display = 'none'; }, 300); }, 2000);
+  }
+
   // ── Init ───────────────────────────────────────────────
   async function init() {
     // Restore toggle
@@ -48,12 +61,22 @@
       sendToActiveTab({ type: 'PG_TOGGLE', enabled });
     });
 
-    // Request current state from content script
-    sendToActiveTab({ type: 'PG_REQUEST_STATE' });
+    // Request current state from content script (with callback)
+    sendToActiveTab({ type: 'PG_REQUEST_STATE' }, (data) => {
+      if (data) updateUI(data);
+    });
+
+    // Poll every 1.5 s so the popup stays up-to-date
+    setInterval(() => {
+      sendToActiveTab({ type: 'PG_REQUEST_STATE' }, (data) => {
+        if (data) updateUI(data);
+      });
+    }, 1500);
 
     // Redact all
     btnRedactAll.addEventListener('click', () => {
       sendToActiveTab({ type: 'PG_REDACT_ALL' });
+      setTimeout(() => showFeedback('Redaction complete!'), 400);
     });
 
     // Listen for updates from content script
@@ -64,11 +87,14 @@
     });
   }
 
-  // ── Send message to active tab ─────────────────────────
-  function sendToActiveTab(message) {
+  // ── Send message to active tab (frameId: 0 = main frame only) ──
+  function sendToActiveTab(message, callback) {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (tabs[0]?.id) {
-        chrome.tabs.sendMessage(tabs[0].id, message).catch(() => {});
+        chrome.tabs.sendMessage(tabs[0].id, message, { frameId: 0 }, (response) => {
+          if (chrome.runtime.lastError) { /* ignore */ }
+          if (callback) callback(response);
+        });
       }
     });
   }

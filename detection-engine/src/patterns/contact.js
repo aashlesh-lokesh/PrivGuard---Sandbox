@@ -45,8 +45,26 @@ export const CONTACT_PATTERNS = [
     },
     redact: (raw) => {
       const d = raw.replace(/\D/g, '');
-      const last4 = d.slice(-4);
-      return `(***) ***-${last4}`;
+      return 'x'.repeat(d.length - 2) + d.slice(-2);
+    },
+  },
+  {
+    id: 'PHONE_IN',
+    type: 'PHONE_NUMBER',
+    label: 'Indian Phone Number',
+    category: 'contact',
+    severity: 'MEDIUM',
+    confidence: 0.88,
+    // Indian mobile: optional +91, starts with 6-9, 10 digits
+    pattern: /\b(?:\+?91[\s.\-]?)?[6-9]\d{4}[\s.\-]?\d{5}\b/g,
+    validate: (m) => {
+      const digits = m.replace(/\D/g, '');
+      const core = digits.startsWith('91') && digits.length === 12 ? digits.slice(2) : digits;
+      return core.length === 10;
+    },
+    redact: (raw) => {
+      const d = raw.replace(/\D/g, '');
+      return 'x'.repeat(d.length - 2) + d.slice(-2);
     },
   },
   {

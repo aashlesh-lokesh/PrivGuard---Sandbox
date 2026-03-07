@@ -36,11 +36,11 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["engine/*.js"],
+      "resources": ["engine/*.js", "lib/*"],
       "matches": ["<all_urls>"]
     }
   ],
   "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
   }
 }

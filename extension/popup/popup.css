@@ -385,6 +385,34 @@ body::-webkit-scrollbar-thumb { background: var(--pg-primary); border-radius: 4p
   border-top: 1px solid var(--pg-border);
 }
 
+/* ─── Image Scanner Button ────────────────────────────── */
+.pg-image-scanner-section {
+  padding: 10px 16px 6px;
+}
+
+.pg-btn-image-scan {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, rgba(108,92,231,0.25), rgba(0,184,148,0.18));
+  border: 1px solid rgba(108,92,231,0.3);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: var(--pg-transition);
+  font-family: inherit;
+}
+.pg-btn-image-scan:hover {
+  background: linear-gradient(135deg, rgba(108,92,231,0.4), rgba(0,184,148,0.28));
+  border-color: var(--pg-primary);
+  transform: translateY(-1px);
+}
+
 /* ─── Disabled overlay ───────────────────────────────── */
 body.pg-disabled .pg-score-section,
 body.pg-disabled .pg-stats,

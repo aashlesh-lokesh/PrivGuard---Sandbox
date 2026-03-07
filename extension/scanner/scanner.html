@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PrivGuard — Image Scanner</title>
+  <link rel="stylesheet" href="scanner.css">
+</head>
+<body>
+  <!-- ─── Header ────────────────────────────────────────── -->
+  <header class="pg-header">
+    <div class="pg-logo">
+      <svg width="32" height="32" viewBox="0 0 28 28" fill="none">
+        <path d="M14 2L3 7v7c0 7.18 4.69 13.89 11 15.5C20.31 27.89 25 21.18 25 14V7L14 2z" fill="url(#gShield)"/>
+        <path d="M10 14.5l2.5 2.5 5.5-5.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs>
+          <linearGradient id="gShield" x1="3" y1="2" x2="25" y2="29.5">
+            <stop stop-color="#6C5CE7"/>
+            <stop offset="1" stop-color="#00B894"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span class="pg-title">PrivGuard Image Scanner</span>
+    </div>
+    <span class="pg-subtitle">Detect &amp; blur sensitive data in images — all processing is local</span>
+  </header>
+
+  <!-- ─── Main Content ──────────────────────────────────── -->
+  <main class="pg-main">
+
+    <!-- Upload Zone -->
+    <section class="pg-upload-zone" id="uploadZone">
+      <svg class="pg-upload-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <h2>Drop an image here</h2>
+      <p>or click to browse &bull; PNG, JPG, BMP, WebP</p>
+      <input type="file" id="fileInput" accept="image/png,image/jpeg,image/bmp,image/webp" hidden>
+    </section>
+
+    <!-- Progress -->
+    <section class="pg-progress" id="progressSection" hidden>
+      <div class="pg-progress-ring-wrap">
+        <svg class="pg-progress-ring" viewBox="0 0 100 100">
+          <circle class="pg-progress-ring-bg" cx="50" cy="50" r="42"/>
+          <circle class="pg-progress-ring-fill" id="progressRing" cx="50" cy="50" r="42"/>
+        </svg>
+        <span class="pg-progress-pct" id="progressPct">0%</span>
+      </div>
+      <p class="pg-progress-label" id="progressLabel">Initializing OCR engine…</p>
+    </section>
+
+    <!-- Results -->
+    <section class="pg-results" id="resultsSection" hidden>
+      <!-- Findings summary -->
+      <div class="pg-results-header">
+        <div class="pg-results-stats">
+          <div class="pg-result-stat">
+            <span class="pg-result-stat-num" id="findingsCount">0</span>
+            <span class="pg-result-stat-label">Sensitive Items</span>
+          </div>
+          <div class="pg-result-stat-divider"></div>
+          <div class="pg-result-stat">
+            <span class="pg-result-stat-num" id="wordsScanned">0</span>
+            <span class="pg-result-stat-label">Words Scanned</span>
+          </div>
+          <div class="pg-result-stat-divider"></div>
+          <div class="pg-result-stat">
+            <span class="pg-result-stat-num" id="riskLevel">SAFE</span>
+            <span class="pg-result-stat-label">Risk Level</span>
+          </div>
+        </div>
+        <div class="pg-results-actions">
+          <button class="pg-btn pg-btn-download" id="btnDownload">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download Safe Image
+          </button>
+          <button class="pg-btn pg-btn-new" id="btnNewScan">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            Scan Another
+          </button>
+        </div>
+      </div>
+
+      <!-- Findings list -->
+      <div class="pg-findings-panel" id="findingsPanel"></div>
+
+      <!-- Canvas area -->
+      <div class="pg-canvas-area">
+        <div class="pg-canvas-label-row">
+          <span class="pg-canvas-label">Original</span>
+          <span class="pg-canvas-label">Protected</span>
+        </div>
+        <div class="pg-canvas-wrap">
+          <canvas id="canvasOriginal"></canvas>
+          <canvas id="canvasProtected"></canvas>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ─── Footer ────────────────────────────────────────── -->
+  <footer class="pg-footer">
+    <span>All OCR &amp; blurring happens locally in your browser — nothing is uploaded anywhere.</span>
+  </footer>
+
+  <script src="../lib/tesseract.min.js"></script>
+  <script src="scanner.js"></script>
+</body>
+</html>

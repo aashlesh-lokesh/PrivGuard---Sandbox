@@ -85,6 +85,11 @@
         updateUI(msg.data);
       }
     });
+
+    // Image scanner button
+    document.getElementById('btnImageScan').addEventListener('click', () => {
+      chrome.tabs.create({ url: chrome.runtime.getURL('scanner/scanner.html') });
+    });
   }
 
   // ── Send message to active tab (frameId: 0 = main frame only) ──

@@ -1,0 +1,242 @@
+/* ═══════════════════════════════════════════════════════════════
+   PrivGuard Content Script Styles
+   Injected into every page for visual feedback.
+   Uses high-specificity selectors & !important to survive page CSS.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── Field Warning Outline ────────────────────────────────── */
+.pg-field-warning {
+  transition: outline-color 0.3s ease !important;
+}
+
+/* ── Tooltip ──────────────────────────────────────────────── */
+.pg-tooltip {
+  position: absolute;
+  z-index: 2147483647 !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.4 !important;
+  color: #E2E8F0 !important;
+  background: linear-gradient(135deg, rgba(26,26,46,0.97), rgba(15,12,41,0.97)) !important;
+  border: 1px solid rgba(108,92,231,0.45) !important;
+  border-radius: 12px !important;
+  padding: 0 !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(108,92,231,0.15) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  overflow: hidden !important;
+  animation: pg-tt-fadein 0.2s ease !important;
+  pointer-events: auto !important;
+  min-width: 220px !important;
+}
+
+@keyframes pg-tt-fadein {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pg-tt-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 10px 14px !important;
+  background: rgba(108,92,231,0.12) !important;
+  border-bottom: 1px solid rgba(108,92,231,0.2) !important;
+  font-size: 13px !important;
+}
+
+.pg-tt-icon {
+  font-size: 16px !important;
+  flex-shrink: 0 !important;
+}
+
+.pg-tt-header strong {
+  flex: 1 !important;
+  font-weight: 600 !important;
+  color: #fff !important;
+}
+
+.pg-tt-score {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: #fff !important;
+}
+
+.pg-tt-body {
+  padding: 10px 14px !important;
+}
+
+.pg-tt-item {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 6px !important;
+  padding: 4px 0 !important;
+  font-size: 12px !important;
+}
+
+.pg-tt-item code {
+  background: rgba(255,255,255,0.08) !important;
+  padding: 1px 5px !important;
+  border-radius: 3px !important;
+  font-family: 'Fira Code', 'Cascadia Code', monospace !important;
+  font-size: 11px !important;
+  color: #B2BEC3 !important;
+  word-break: break-all !important;
+}
+
+.pg-tt-sev {
+  flex-shrink: 0 !important;
+  font-size: 10px !important;
+  line-height: 1.6 !important;
+}
+
+.pg-tt-more {
+  font-size: 11px !important;
+  color: #A29BFE !important;
+  padding-top: 4px !important;
+  font-style: italic !important;
+}
+
+.pg-tt-actions {
+  display: flex !important;
+  gap: 6px !important;
+  padding: 8px 14px 10px !important;
+  border-top: 1px solid rgba(108,92,231,0.15) !important;
+}
+
+.pg-tt-btn {
+  flex: 1 !important;
+  padding: 6px 10px !important;
+  border-radius: 6px !important;
+  border: none !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  text-align: center !important;
+}
+
+.pg-tt-btn-redact {
+  background: linear-gradient(135deg, #6C5CE7, #A29BFE) !important;
+  color: #fff !important;
+}
+.pg-tt-btn-redact:hover {
+  background: linear-gradient(135deg, #5A4BD1, #938AEA) !important;
+  transform: scale(1.02) !important;
+}
+
+.pg-tt-btn-dismiss {
+  background: rgba(255,255,255,0.06) !important;
+  color: #A29BFE !important;
+  border: 1px solid rgba(108,92,231,0.2) !important;
+}
+.pg-tt-btn-dismiss:hover {
+  background: rgba(255,255,255,0.1) !important;
+}
+
+/* ── Form Submit Warning Modal ─────────────────────────── */
+.pg-submit-overlay {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  background: rgba(0,0,0,0.6) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  animation: pg-overlay-in 0.2s ease !important;
+}
+
+@keyframes pg-overlay-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.pg-submit-modal {
+  background: linear-gradient(145deg, #1A1A2E, #16213E) !important;
+  border: 1px solid rgba(108,92,231,0.4) !important;
+  border-radius: 16px !important;
+  padding: 32px 28px !important;
+  max-width: 400px !important;
+  width: 90vw !important;
+  text-align: center !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5) !important;
+  animation: pg-modal-in 0.3s ease !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+@keyframes pg-modal-in {
+  from { opacity: 0; transform: scale(0.9) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.pg-modal-icon {
+  font-size: 48px !important;
+  margin-bottom: 12px !important;
+}
+
+.pg-submit-modal h2 {
+  color: #E2E8F0 !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  margin: 0 0 8px !important;
+}
+
+.pg-submit-modal p {
+  color: #94A3B8 !important;
+  font-size: 14px !important;
+  margin: 0 0 20px !important;
+  line-height: 1.5 !important;
+}
+
+.pg-modal-actions {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+}
+
+.pg-modal-btn {
+  width: 100% !important;
+  padding: 10px 16px !important;
+  border-radius: 8px !important;
+  border: none !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  font-family: inherit !important;
+}
+
+.pg-modal-btn-redact {
+  background: linear-gradient(135deg, #6C5CE7, #A29BFE) !important;
+  color: #fff !important;
+}
+.pg-modal-btn-redact:hover {
+  transform: scale(1.02) !important;
+  box-shadow: 0 4px 16px rgba(108,92,231,0.4) !important;
+}
+
+.pg-modal-btn-submit {
+  background: rgba(214,48,49,0.15) !important;
+  color: #D63031 !important;
+  border: 1px solid rgba(214,48,49,0.3) !important;
+}
+.pg-modal-btn-submit:hover {
+  background: rgba(214,48,49,0.25) !important;
+}
+
+.pg-modal-btn-cancel {
+  background: rgba(255,255,255,0.05) !important;
+  color: #94A3B8 !important;
+}
+.pg-modal-btn-cancel:hover {
+  background: rgba(255,255,255,0.1) !important;
+  color: #E2E8F0 !important;
+}

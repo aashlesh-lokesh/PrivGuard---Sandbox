@@ -1,0 +1,394 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   PrivGuard Popup – Modern Glassmorphism UI
+   ═══════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --pg-primary: #6C5CE7;
+  --pg-primary-light: #a29bfe;
+  --pg-success: #00B894;
+  --pg-warning: #FDCB6E;
+  --pg-danger: #E17055;
+  --pg-critical: #D63031;
+  --pg-bg: #0F0F1A;
+  --pg-surface: rgba(255,255,255,0.05);
+  --pg-surface2: rgba(255,255,255,0.08);
+  --pg-text: #DFE6E9;
+  --pg-text-muted: #b2bec3;
+  --pg-border: rgba(255,255,255,0.08);
+  --pg-radius: 14px;
+  --pg-transition: 0.25s cubic-bezier(.4,0,.2,1);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  width: 380px;
+  min-height: 480px;
+  max-height: 600px;
+  overflow-y: auto;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: var(--pg-bg);
+  color: var(--pg-text);
+}
+
+body::-webkit-scrollbar { width: 4px; }
+body::-webkit-scrollbar-track { background: transparent; }
+body::-webkit-scrollbar-thumb { background: var(--pg-primary); border-radius: 4px; }
+
+/* ─── Header ──────────────────────────────────────────── */
+.pg-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, rgba(108,92,231,0.15), rgba(0,184,148,0.08));
+  border-bottom: 1px solid var(--pg-border);
+  backdrop-filter: blur(12px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.pg-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pg-title {
+  font-size: 18px;
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--pg-primary-light), var(--pg-success));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  letter-spacing: -0.3px;
+}
+
+/* Toggle */
+.pg-toggle { position: relative; display: inline-block; width: 42px; height: 24px; }
+.pg-toggle input { opacity: 0; width: 0; height: 0; }
+.pg-toggle-slider {
+  position: absolute; inset: 0; cursor: pointer;
+  background: rgba(255,255,255,0.12);
+  border-radius: 24px;
+  transition: var(--pg-transition);
+}
+.pg-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  left: 3px; bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: var(--pg-transition);
+}
+.pg-toggle input:checked + .pg-toggle-slider {
+  background: linear-gradient(135deg, var(--pg-primary), var(--pg-success));
+}
+.pg-toggle input:checked + .pg-toggle-slider::before {
+  transform: translateX(18px);
+}
+
+/* ─── Score Ring ──────────────────────────────────────── */
+.pg-score-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 20px 16px;
+}
+
+.pg-ring-container {
+  position: relative;
+  width: 120px;
+  height: 120px;
+}
+
+.pg-ring { transform: rotate(-90deg); width: 100%; height: 100%; }
+
+.pg-ring-bg {
+  fill: none;
+  stroke: var(--pg-surface2);
+  stroke-width: 8;
+}
+
+.pg-ring-fill {
+  fill: none;
+  stroke: var(--pg-success);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 326.73;
+  stroke-dashoffset: 326.73;
+  transition: stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1), stroke 0.4s ease;
+}
+
+.pg-ring-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.pg-ring-number {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--pg-success), var(--pg-success));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transition: var(--pg-transition);
+}
+
+.pg-ring-caption {
+  font-size: 11px;
+  color: var(--pg-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 2px;
+}
+
+/* Risk badge */
+.pg-risk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  background: var(--pg-surface);
+  border: 1px solid var(--pg-border);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.pg-risk-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--pg-success);
+  transition: background 0.3s ease;
+}
+
+/* Risk-level modifiers */
+.pg-risk-badge[data-level="NONE"]     .pg-risk-dot { background: #636e72; }
+.pg-risk-badge[data-level="LOW"]      .pg-risk-dot { background: var(--pg-success); }
+.pg-risk-badge[data-level="MEDIUM"]   .pg-risk-dot { background: var(--pg-warning); }
+.pg-risk-badge[data-level="HIGH"]     .pg-risk-dot { background: var(--pg-danger); }
+.pg-risk-badge[data-level="CRITICAL"] .pg-risk-dot { background: var(--pg-critical); box-shadow: 0 0 8px var(--pg-critical); }
+
+.pg-risk-badge[data-level="NONE"]     { color: #636e72; }
+.pg-risk-badge[data-level="LOW"]      { color: var(--pg-success); }
+.pg-risk-badge[data-level="MEDIUM"]   { color: var(--pg-warning); }
+.pg-risk-badge[data-level="HIGH"]     { color: var(--pg-danger); }
+.pg-risk-badge[data-level="CRITICAL"] { color: var(--pg-critical); border-color: rgba(214,48,49,0.3); }
+
+/* ─── Stats Bar ──────────────────────────────────────── */
+.pg-stats {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  padding: 14px 20px;
+  margin: 0 16px;
+  background: var(--pg-surface);
+  border-radius: var(--pg-radius);
+  border: 1px solid var(--pg-border);
+}
+
+.pg-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.pg-stat-number {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--pg-primary-light);
+}
+
+.pg-stat-label {
+  font-size: 10px;
+  color: var(--pg-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+}
+
+.pg-stat-divider {
+  width: 1px;
+  height: 30px;
+  background: var(--pg-border);
+}
+
+/* ─── Findings Section ───────────────────────────────── */
+.pg-findings-section {
+  padding: 16px;
+}
+
+.pg-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.pg-section-header h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pg-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.pg-btn-redact-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, var(--pg-primary), #5f3dd6);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--pg-transition);
+}
+.pg-btn-redact-all:hover { opacity: 0.88; transform: translateY(-1px); }
+.pg-btn-redact-all:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+/* Findings list */
+.pg-findings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.pg-findings-list::-webkit-scrollbar { width: 3px; }
+.pg-findings-list::-webkit-scrollbar-thumb { background: var(--pg-primary); border-radius: 3px; }
+
+/* Single finding card */
+.pg-finding {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--pg-surface);
+  border: 1px solid var(--pg-border);
+  border-radius: 10px;
+  transition: var(--pg-transition);
+  animation: pgSlideIn 0.3s ease;
+}
+.pg-finding:hover { background: var(--pg-surface2); }
+
+@keyframes pgSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.pg-finding-icon {
+  width: 32px; height: 32px; min-width: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px;
+}
+.pg-finding-icon[data-severity="CRITICAL"] { background: rgba(214,48,49,0.15); }
+.pg-finding-icon[data-severity="HIGH"]     { background: rgba(225,112,85,0.15); }
+.pg-finding-icon[data-severity="MEDIUM"]   { background: rgba(253,203,110,0.12); }
+.pg-finding-icon[data-severity="LOW"]      { background: rgba(0,184,148,0.12); }
+
+.pg-finding-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.pg-finding-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pg-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pg-finding-value {
+  font-size: 11px;
+  color: var(--pg-text-muted);
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.pg-finding-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 5px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.pg-finding-badge[data-severity="CRITICAL"] { background: rgba(214,48,49,0.15); color: var(--pg-critical); }
+.pg-finding-badge[data-severity="HIGH"]     { background: rgba(225,112,85,0.15); color: var(--pg-danger); }
+.pg-finding-badge[data-severity="MEDIUM"]   { background: rgba(253,203,110,0.12); color: var(--pg-warning); }
+.pg-finding-badge[data-severity="LOW"]      { background: rgba(0,184,148,0.12); color: var(--pg-success); }
+
+.pg-btn-redact {
+  width: 28px; height: 28px; min-width: 28px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--pg-surface2);
+  border: 1px solid var(--pg-border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--pg-text-muted);
+  transition: var(--pg-transition);
+}
+.pg-btn-redact:hover {
+  background: var(--pg-primary);
+  color: #fff;
+  border-color: var(--pg-primary);
+}
+
+/* Empty state */
+.pg-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px 16px;
+  text-align: center;
+}
+.pg-empty-state p {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pg-text-muted);
+}
+.pg-empty-state span {
+  font-size: 11px;
+  color: #636e72;
+  line-height: 1.5;
+}
+
+/* ─── Footer ─────────────────────────────────────────── */
+.pg-footer {
+  text-align: center;
+  padding: 12px 20px 14px;
+  font-size: 10px;
+  color: #636e72;
+  border-top: 1px solid var(--pg-border);
+}
+
+/* ─── Disabled overlay ───────────────────────────────── */
+body.pg-disabled .pg-score-section,
+body.pg-disabled .pg-stats,
+body.pg-disabled .pg-findings-section {
+  opacity: 0.3;
+  pointer-events: none;
+}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=400">
+  <link rel="stylesheet" href="popup.css">
+  <title>PrivGuard</title>
+</head>
+<body>
+  <!-- ─── Header ────────────────────────────────────────── -->
+  <header class="pg-header">
+    <div class="pg-logo">
+      <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+        <path d="M14 2L3 7v7c0 7.18 4.69 13.89 11 15.5C20.31 27.89 25 21.18 25 14V7L14 2z" fill="url(#gShield)"/>
+        <path d="M10 14.5l2.5 2.5 5.5-5.5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs>
+          <linearGradient id="gShield" x1="3" y1="2" x2="25" y2="29.5">
+            <stop stop-color="#6C5CE7"/>
+            <stop offset="1" stop-color="#00B894"/>
+          </linearGradient>
+        </defs>
+      </svg>
+      <span class="pg-title">PrivGuard</span>
+    </div>
+    <label class="pg-toggle" title="Enable / Disable scanning">
+      <input type="checkbox" id="masterToggle" checked>
+      <span class="pg-toggle-slider"></span>
+    </label>
+  </header>
+
+  <!-- ─── Risk Score Ring ───────────────────────────────── -->
+  <section class="pg-score-section">
+    <div class="pg-ring-container">
+      <svg class="pg-ring" viewBox="0 0 120 120">
+        <circle class="pg-ring-bg" cx="60" cy="60" r="52"/>
+        <circle class="pg-ring-fill" id="scoreRing" cx="60" cy="60" r="52"/>
+      </svg>
+      <div class="pg-ring-label">
+        <span class="pg-ring-number" id="scoreValue">0</span>
+        <span class="pg-ring-caption">Risk Score</span>
+      </div>
+    </div>
+    <div class="pg-risk-badge" id="riskBadge">
+      <span class="pg-risk-dot"></span>
+      <span class="pg-risk-text" id="riskText">SAFE</span>
+    </div>
+  </section>
+
+  <!-- ─── Stats Bar ────────────────────────────────────── -->
+  <section class="pg-stats">
+    <div class="pg-stat">
+      <span class="pg-stat-number" id="statFindings">0</span>
+      <span class="pg-stat-label">Findings</span>
+    </div>
+    <div class="pg-stat-divider"></div>
+    <div class="pg-stat">
+      <span class="pg-stat-number" id="statFields">0</span>
+      <span class="pg-stat-label">Fields Scanned</span>
+    </div>
+    <div class="pg-stat-divider"></div>
+    <div class="pg-stat">
+      <span class="pg-stat-number" id="statRedacted">0</span>
+      <span class="pg-stat-label">Redacted</span>
+    </div>
+  </section>
+
+  <!-- ─── Findings List ────────────────────────────────── -->
+  <section class="pg-findings-section">
+    <div class="pg-section-header">
+      <h3>Detected Items</h3>
+      <button class="pg-btn-redact-all" id="btnRedactAll" disabled>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+          <line x1="1" y1="1" x2="23" y2="23"/>
+        </svg>
+        Redact All
+      </button>
+    </div>
+    <div class="pg-findings-list" id="findingsList">
+      <div class="pg-empty-state" id="emptyState">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#b2bec3" stroke-width="1.5">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <p>No sensitive data detected</p>
+        <span>Start typing in any input field — PrivGuard monitors automatically.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── Footer ────────────────────────────────────────── -->
+  <footer class="pg-footer">
+    <span>🔒 All processing is local — your data never leaves the browser</span>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

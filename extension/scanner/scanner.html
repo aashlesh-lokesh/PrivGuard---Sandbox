@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PrivGuard — Image Scanner</title>
+  <title>PrivGuard — Document Scanner</title>
   <link rel="stylesheet" href="scanner.css">
 </head>
 <body>
@@ -20,7 +20,7 @@
           </linearGradient>
         </defs>
       </svg>
-      <span class="pg-title">PrivGuard Image Scanner</span>
+      <span class="pg-title">PrivGuard Document Scanner</span>
     </div>
     <span class="pg-subtitle" id="headerSubtitle">Detect &amp; blur sensitive data in images</span>
   </header>
@@ -72,9 +72,9 @@
         <polyline points="17 8 12 3 7 8"/>
         <line x1="12" y1="3" x2="12" y2="15"/>
       </svg>
-      <h2>Drop an image here</h2>
-      <p>or click to browse &bull; PNG, JPG, BMP, WebP</p>
-      <input type="file" id="fileInput" accept="image/png,image/jpeg,image/bmp,image/webp" hidden>
+      <h2>Drop an image or PDF here</h2>
+      <p>or click to browse &bull; PNG, JPG, BMP, WebP, PDF</p>
+      <input type="file" id="fileInput" accept="image/png,image/jpeg,image/bmp,image/webp,application/pdf" hidden>
     </section>
 
     <!-- Progress -->
@@ -116,7 +116,15 @@
               <polyline points="7 10 12 15 17 10"/>
               <line x1="12" y1="15" x2="12" y2="3"/>
             </svg>
-            Download Safe Image
+            Download Safe Page
+          </button>
+          <button class="pg-btn pg-btn-download-all" id="btnDownloadAll" hidden>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download Safe PDF
           </button>
           <button class="pg-btn pg-btn-new" id="btnNewScan">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -128,8 +136,31 @@
         </div>
       </div>
 
+      <!-- PDF Aggregate Summary (shown only for PDFs) -->
+      <div class="pg-pdf-summary" id="pdfSummary" hidden>
+        <h3 class="pg-pdf-summary-title">📄 Full Document Summary</h3>
+        <div class="pg-pdf-summary-stats">
+          <div class="pg-pdf-stat"><span class="pg-pdf-stat-num" id="pdfTotalFindings">0</span><span class="pg-pdf-stat-label">Total Sensitive Items</span></div>
+          <div class="pg-pdf-stat"><span class="pg-pdf-stat-num" id="pdfTotalWords">0</span><span class="pg-pdf-stat-label">Total Words</span></div>
+          <div class="pg-pdf-stat"><span class="pg-pdf-stat-num" id="pdfTotalPages">0</span><span class="pg-pdf-stat-label">Pages Scanned</span></div>
+          <div class="pg-pdf-stat"><span class="pg-pdf-stat-num" id="pdfOverallRisk">SAFE</span><span class="pg-pdf-stat-label">Overall Risk</span></div>
+        </div>
+        <div class="pg-pdf-breakdown" id="pdfBreakdown"></div>
+      </div>
+
       <!-- Findings list -->
       <div class="pg-findings-panel" id="findingsPanel"></div>
+
+      <!-- PDF Page Navigation -->
+      <div class="pg-page-nav" id="pageNav" hidden>
+        <button class="pg-page-btn" id="btnPrevPage" title="Previous page">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span class="pg-page-info">Page <span id="currentPage">1</span> / <span id="totalPages">1</span></span>
+        <button class="pg-page-btn" id="btnNextPage" title="Next page">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+        </button>
+      </div>
 
       <!-- Canvas area -->
       <div class="pg-canvas-area">
@@ -152,6 +183,8 @@
   </footer>
 
   <script src="../lib/tesseract.min.js"></script>
+  <script src="../lib/pdf.min.js"></script>
+  <script src="../lib/jspdf.umd.min.js"></script>
   <script src="scanner.js"></script>
 </body>
 </html>

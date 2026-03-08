@@ -1,10 +1,11 @@
 /**
- * PrivGuard Image Scanner
+ * PrivGuard Document Scanner
  *
+ * Supports images (PNG, JPG, BMP, WebP) and PDFs.
  * Two scan modes:
  *   Local  — Tesseract.js OCR + regex patterns (fully offline)
- *   NVIDIA — Tesseract.js for word positions + NVIDIA NIM vision LLM for
- *            semantic PII detection (images sent to NVIDIA servers)
+ *   NVIDIA — Tesseract.js for word positions + NVIDIA NIM LLM for
+ *            semantic PII detection (only text sent to NVIDIA)
  */
 
 (function () {
@@ -36,8 +37,25 @@
   const apiKeyStatus    = document.getElementById('apiKeyStatus');
   const headerSubtitle  = document.getElementById('headerSubtitle');
   const footerNote      = document.getElementById('footerNote');
+  const pageNavEl       = document.getElementById('pageNav');
+  const btnPrevPage     = document.getElementById('btnPrevPage');
+  const btnNextPage     = document.getElementById('btnNextPage');
+  const currentPageEl   = document.getElementById('currentPage');
+  const totalPagesEl    = document.getElementById('totalPages');
+  const btnDownloadAll  = document.getElementById('btnDownloadAll');
+  const pdfSummaryEl    = document.getElementById('pdfSummary');
+  const pdfTotalFindings = document.getElementById('pdfTotalFindings');
+  const pdfTotalWords   = document.getElementById('pdfTotalWords');
+  const pdfTotalPagesEl = document.getElementById('pdfTotalPages');
+  const pdfOverallRisk  = document.getElementById('pdfOverallRisk');
+  const pdfBreakdown    = document.getElementById('pdfBreakdown');
 
   const RING_CIRCUMFERENCE = 2 * Math.PI * 42; // ~263.89
+
+  /* ═══════════════════════════════════════════════════════════
+     PDF STATE
+     ═══════════════════════════════════════════════════════════ */
+  let pdfState = null; // { doc, pages: [{ ocrData, findings, origDataUrl, protDataUrl }], currentPage: 0 }
 
   /* ═══════════════════════════════════════════════════════════
      SETTINGS
@@ -214,24 +232,142 @@
     e.preventDefault();
     uploadZone.classList.remove('pg-dragover');
     const file = e.dataTransfer.files[0];
-    if (file && file.type.startsWith('image/')) {
-      processImage(file);
-    }
+    if (file) routeFile(file);
   });
 
   fileInput.addEventListener('change', () => {
     const file = fileInput.files[0];
-    if (file) processImage(file);
+    if (file) routeFile(file);
   });
 
   btnNewScan.addEventListener('click', resetToUpload);
 
   btnDownload.addEventListener('click', () => {
     const link = document.createElement('a');
-    link.download = 'privguard-protected.png';
-    link.href = canvasProtected.toDataURL('image/png');
+    if (pdfState) {
+      const pg = pdfState.pages[pdfState.currentPage];
+      link.download = `privguard-protected-page${pdfState.currentPage + 1}.png`;
+      link.href = pg.protDataUrl;
+    } else {
+      link.download = 'privguard-protected.png';
+      link.href = canvasProtected.toDataURL('image/png');
+    }
     link.click();
   });
+
+  btnDownloadAll.addEventListener('click', async () => {
+    if (!pdfState || !pdfState.pages.length) return;
+    const { jsPDF } = window.jspdf;
+
+    // Use the first page's dimensions to initialise, then add pages
+    const firstImg = await loadImageFromUrl(pdfState.pages[0].protDataUrl);
+    const pdf = new jsPDF({
+      orientation: firstImg.width > firstImg.height ? 'landscape' : 'portrait',
+      unit: 'px',
+      format: [firstImg.width, firstImg.height],
+    });
+    pdf.addImage(firstImg.src, 'PNG', 0, 0, firstImg.width, firstImg.height);
+
+    for (let i = 1; i < pdfState.pages.length; i++) {
+      const img = await loadImageFromUrl(pdfState.pages[i].protDataUrl);
+      pdf.addPage([img.width, img.height], img.width > img.height ? 'landscape' : 'portrait');
+      pdf.addImage(img.src, 'PNG', 0, 0, img.width, img.height);
+    }
+
+    pdf.save('privguard-protected.pdf');
+  });
+
+  function loadImageFromUrl(url) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = url;
+    });
+  }
+
+  /* Page navigation */
+  btnPrevPage.addEventListener('click', () => navigatePage(-1));
+  btnNextPage.addEventListener('click', () => navigatePage(1));
+
+  function navigatePage(delta) {
+    if (!pdfState) return;
+    const newPage = pdfState.currentPage + delta;
+    if (newPage < 0 || newPage >= pdfState.pages.length) return;
+    pdfState.currentPage = newPage;
+    showPdfPage(newPage);
+  }
+
+  function showPdfPage(idx) {
+    const pg = pdfState.pages[idx];
+    currentPageEl.textContent = idx + 1;
+
+    // Draw cached images onto canvases
+    const origImg = new Image();
+    origImg.onload = () => drawOnCanvas(canvasOriginal, origImg);
+    origImg.src = pg.origDataUrl;
+
+    const protImg = new Image();
+    protImg.onload = () => drawOnCanvas(canvasProtected, protImg);
+    protImg.src = pg.protDataUrl;
+
+    // Update per-page findings panel (stats bar shows page data)
+    showResults(pg.ocrData, pg.findings);
+    btnPrevPage.disabled = idx === 0;
+    btnNextPage.disabled = idx === pdfState.pages.length - 1;
+  }
+
+  /** Show aggregate summary across all PDF pages */
+  function showPdfAggregateSummary() {
+    if (!pdfState || pdfState.pages.length === 0) return;
+
+    const allFindings = [];
+    let totalWords = 0;
+    const perPage = [];
+
+    for (let i = 0; i < pdfState.pages.length; i++) {
+      const pg = pdfState.pages[i];
+      allFindings.push(...pg.findings);
+      const wc = pg.ocrData.words ? pg.ocrData.words.length : countWords(pg.ocrData);
+      totalWords += wc;
+      perPage.push({ page: i + 1, findings: pg.findings.length, words: wc });
+    }
+
+    // Aggregate risk
+    let rawScore = 0;
+    for (const f of allFindings) rawScore += SEVERITY_WEIGHTS[f.severity] || 10;
+    const score = Math.min(100, rawScore);
+    const risk = score >= 80 ? 'CRITICAL' : score >= 55 ? 'HIGH' : score >= 30 ? 'MEDIUM' : score >= 1 ? 'LOW' : 'SAFE';
+    const riskColors = { CRITICAL: '#D63031', HIGH: '#E17055', MEDIUM: '#FDCB6E', LOW: '#00B894', SAFE: '#636e72' };
+
+    pdfTotalFindings.textContent = allFindings.length;
+    pdfTotalWords.textContent = totalWords;
+    pdfTotalPagesEl.textContent = pdfState.pages.length;
+    pdfOverallRisk.textContent = risk;
+    pdfOverallRisk.style.color = riskColors[risk] || '#636e72';
+
+    // Per-page breakdown
+    pdfBreakdown.innerHTML = perPage.map(p => {
+      const icon = p.findings > 0 ? '⚠️' : '✅';
+      return `<span class="pg-pdf-page-chip${p.findings > 0 ? ' pg-pdf-page-warn' : ''}">${icon} Page ${p.page}: ${p.findings} item${p.findings !== 1 ? 's' : ''}</span>`;
+    }).join('');
+
+    pdfSummaryEl.hidden = false;
+    btnDownloadAll.hidden = false;
+  }
+
+  /** Route uploaded file to the correct pipeline */
+  function routeFile(file) {
+    if (file.type === 'application/pdf') {
+      processPDF(file);
+    } else if (file.type.startsWith('image/')) {
+      pdfState = null;
+      pageNavEl.hidden = true;
+      pdfSummaryEl.hidden = true;
+      btnDownloadAll.hidden = true;
+      processImage(file);
+    }
+  }
 
   /* ═══════════════════════════════════════════════════════════
      MAIN PIPELINE
@@ -713,7 +849,7 @@ If nothing found, respond: []`;
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             <polyline points="9 12 11 14 15 10"/>
           </svg>
-          <span>No sensitive data detected in this image.</span>
+          <span>No sensitive data detected.</span>
         </div>`;
     } else {
       for (const f of findings) {
@@ -738,6 +874,10 @@ If nothing found, respond: []`;
     resultsSection.hidden = true;
     progressSection.hidden = true;
     uploadZone.hidden = false;
+    pageNavEl.hidden = true;
+    pdfSummaryEl.hidden = true;
+    btnDownloadAll.hidden = true;
+    pdfState = null;
     fileInput.value = '';
     findingsPanel.innerHTML = '';
   }
@@ -749,6 +889,113 @@ If nothing found, respond: []`;
   /* ═══════════════════════════════════════════════════════════
      INIT
      ═══════════════════════════════════════════════════════════ */
+
+  // Configure PDF.js worker
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = chrome.runtime.getURL('lib/pdf.worker.min.js');
+  }
+
   loadSettings();
+
+  /* ═══════════════════════════════════════════════════════════
+     PDF PIPELINE
+     Renders each page to canvas, runs OCR (Tesseract) + PII
+     detection, blurs findings, caches results per page.
+     ═══════════════════════════════════════════════════════════ */
+
+  async function processPDF(file) {
+    showProgress();
+    try {
+      updateProgress(2, 'Loading PDF…');
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const numPages = pdf.numPages;
+      console.log(`[PrivGuard] PDF loaded: ${numPages} page(s)`);
+
+      pdfState = { doc: pdf, pages: [], currentPage: 0 };
+
+      for (let i = 1; i <= numPages; i++) {
+        const basePct = Math.round(((i - 1) / numPages) * 90);
+        updateProgress(basePct + 2, `Processing page ${i} of ${numPages}…`);
+
+        const page = await pdf.getPage(i);
+
+        // Render page to an offscreen canvas at 2x scale for quality
+        const scale = 2;
+        const viewport = page.getViewport({ scale });
+        const offscreen = document.createElement('canvas');
+        offscreen.width = viewport.width;
+        offscreen.height = viewport.height;
+        const ctx = offscreen.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        // Save original page image
+        const origDataUrl = offscreen.toDataURL('image/png');
+
+        // Convert rendered page to Image for OCR
+        const pageImg = await createImageFromDataUrl(origDataUrl);
+
+        // OCR the rendered page
+        updateProgress(basePct + 20, `OCR on page ${i}…`);
+        const ocrResult = await runOCR(pageImg);
+
+        // Detect sensitive data
+        let findings;
+        if (scannerMode === 'nvidia' && nvidiaApiKey) {
+          const ocrText = ocrResult.text || '';
+          let nemotronFindings = [];
+          if (ocrText.trim()) {
+            try {
+              updateProgress(basePct + 50, `Nemotron analysis on page ${i}…`);
+              const rawFindings = await runNemotronTextScan(ocrText);
+              nemotronFindings = matchFindingsToOcrBoxes(rawFindings, ocrResult);
+            } catch(e) { console.warn('[PrivGuard] Nemotron failed on page', i, e); }
+          }
+          const localFindings = detectSensitiveData(ocrResult);
+          findings = mergeFindings(nemotronFindings, localFindings);
+        } else {
+          findings = detectSensitiveData(ocrResult);
+        }
+
+        console.log(`[PrivGuard] Page ${i}: ${findings.length} sensitive item(s)`);
+
+        // Draw original + blur on a copy
+        drawOnCanvas(canvasOriginal, pageImg);
+        drawOnCanvas(canvasProtected, pageImg);
+        if (findings.length > 0) {
+          blurSensitiveRegions(canvasProtected, pageImg, findings);
+        }
+        const protDataUrl = canvasProtected.toDataURL('image/png');
+
+        pdfState.pages.push({ ocrData: ocrResult, findings, origDataUrl, protDataUrl });
+      }
+
+      // Show first page + aggregate
+      updateProgress(100, 'Done!');
+      totalPagesEl.textContent = numPages;
+      pageNavEl.hidden = numPages <= 1;
+      setTimeout(() => {
+        pdfState.currentPage = 0;
+        showPdfAggregateSummary();
+        showPdfPage(0);
+        progressSection.hidden = true;
+        resultsSection.hidden = false;
+      }, 400);
+
+    } catch (err) {
+      console.error('[PrivGuard PDF Scanner] Error:', err);
+      const msg = (err && (err.message || err.toString())) || 'Unknown error occurred';
+      updateProgress(0, 'Error: ' + msg);
+    }
+  }
+
+  function createImageFromDataUrl(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('Failed to create image from PDF page'));
+      img.src = dataUrl;
+    });
+  }
 
 })();

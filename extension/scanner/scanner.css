@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   PrivGuard Image Scanner – Styles
+   PrivGuard Document Scanner – Styles
    ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
@@ -243,8 +243,84 @@ body {
   background: linear-gradient(135deg, var(--pg-success), #00a381);
 }
 
+.pg-btn-download-all {
+  background: linear-gradient(135deg, #0984e3, #0652DD);
+}
+
 .pg-btn-new {
   background: linear-gradient(135deg, var(--pg-primary), #5f3dd6);
+}
+
+/* ─── PDF Aggregate Summary ───────────────────────────── */
+.pg-pdf-summary {
+  background: var(--pg-surface);
+  border: 1px solid var(--pg-border);
+  border-radius: var(--pg-radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.pg-pdf-summary-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 14px;
+  color: var(--pg-text);
+}
+
+.pg-pdf-summary-stats {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 14px;
+}
+
+.pg-pdf-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  padding: 10px 6px;
+  background: var(--pg-surface2);
+  border-radius: 10px;
+}
+
+.pg-pdf-stat-num {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--pg-primary-light);
+}
+
+.pg-pdf-stat-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--pg-text-muted);
+  margin-top: 4px;
+}
+
+.pg-pdf-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pg-pdf-page-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  background: rgba(0,184,148,0.1);
+  color: var(--pg-success);
+  border: 1px solid rgba(0,184,148,0.2);
+}
+
+.pg-pdf-page-chip.pg-pdf-page-warn {
+  background: rgba(225,112,85,0.1);
+  color: var(--pg-danger);
+  border-color: rgba(225,112,85,0.2);
 }
 
 /* ─── Findings Panel ──────────────────────────────────── */
@@ -275,6 +351,47 @@ body {
 @keyframes pgSlideIn {
   from { opacity: 0; transform: translateY(6px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── PDF Page Navigation ─────────────────────────────── */
+.pg-page-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 12px 0;
+}
+
+.pg-page-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--pg-border);
+  border-radius: 8px;
+  background: var(--pg-surface);
+  color: var(--pg-text);
+  cursor: pointer;
+  transition: var(--pg-transition);
+}
+
+.pg-page-btn:hover:not(:disabled) {
+  background: var(--pg-surface2);
+  border-color: var(--pg-primary);
+}
+
+.pg-page-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.pg-page-info {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pg-text-muted);
+  min-width: 100px;
+  text-align: center;
 }
 
 /* ─── Canvas Area ─────────────────────────────────────── */

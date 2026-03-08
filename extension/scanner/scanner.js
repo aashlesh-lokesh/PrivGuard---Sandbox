@@ -333,7 +333,8 @@
 
   function blurSensitiveRegions(canvas, img, findings) {
     const ctx = canvas.getContext('2d');
-    const PAD = 6; // padding around each word box
+    const PAD = 8; // padding around each word box
+    const BLUR_PASSES = 4; // stack multiple passes for an opaque blur
 
     for (const f of findings) {
       for (const box of f.boxes) {
@@ -342,56 +343,26 @@
         const bw = Math.min(canvas.width - x,  box.w + PAD * 2);
         const bh = Math.min(canvas.height - y, box.h + PAD * 2);
 
-        // Apply heavy Gaussian blur using the CSS filter trick:
-        // save → clip → filter → redraw → restore
+        // Stack multiple blur passes inside the clipped region.
+        // Each pass redraws the already-blurred pixels, compounding the effect
+        // until the content is fully unreadable.
         ctx.save();
-
-        // Create a clipping region for this box
         ctx.beginPath();
         ctx.roundRect(x, y, bw, bh, 4);
         ctx.clip();
 
-        // Apply blur filter and redraw the image into the clipped area
-        ctx.filter = 'blur(16px)';
-        ctx.drawImage(img, 0, 0);
+        for (let i = 0; i < BLUR_PASSES; i++) {
+          ctx.filter = 'blur(24px)';
+          ctx.drawImage(canvas, 0, 0); // draw current canvas state (not original img)
+        }
 
-        // Add a semi-transparent overlay for visual emphasis
         ctx.filter = 'none';
-        const overlayColor = getSeverityColor(f.severity);
-        ctx.fillStyle = overlayColor;
-        ctx.fillRect(x, y, bw, bh);
-
         ctx.restore();
       }
     }
-
-    // Draw border outlines on top so they're visible
-    for (const f of findings) {
-      for (const box of f.boxes) {
-        const x  = Math.max(0, box.x - PAD);
-        const y  = Math.max(0, box.y - PAD);
-        const bw = Math.min(canvas.width - x,  box.w + PAD * 2);
-        const bh = Math.min(canvas.height - y, box.h + PAD * 2);
-
-        ctx.strokeStyle = getSeverityBorderColor(f.severity);
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(x, y, bw, bh, 4);
-        ctx.stroke();
-      }
-    }
   }
 
-  function getSeverityColor(severity) {
-    const map = {
-      CRITICAL: 'rgba(214, 48, 49, 0.25)',
-      HIGH:     'rgba(225, 112, 85, 0.20)',
-      MEDIUM:   'rgba(253, 203, 110, 0.18)',
-      LOW:      'rgba(0, 184, 148, 0.15)',
-    };
-    return map[severity] || map.MEDIUM;
-  }
-
+  // kept to avoid reference errors — no longer used for rendering
   function getSeverityBorderColor(severity) {
     const map = {
       CRITICAL: 'rgba(214, 48, 49, 0.8)',

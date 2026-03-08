@@ -350,3 +350,128 @@ body {
     flex-direction: column;
   }
 }
+
+/* ─── Mode Selector ───────────────────────────────────── */
+.pg-mode-section {
+  margin-bottom: 24px;
+}
+
+.pg-mode-pills {
+  display: inline-flex;
+  background: var(--pg-surface);
+  border: 1px solid var(--pg-border);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.pg-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pg-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: var(--pg-transition);
+  font-family: inherit;
+}
+
+.pg-mode-pill:hover {
+  color: var(--pg-text);
+  background: var(--pg-surface2);
+}
+
+.pg-mode-pill.pg-mode-active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--pg-primary), #5f3dd6);
+  box-shadow: 0 2px 12px rgba(108,92,231,0.35);
+}
+
+/* ─── API Key Panel ───────────────────────────────────── */
+.pg-api-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  background: rgba(253,203,110,0.06);
+  border: 1px solid rgba(253,203,110,0.18);
+  border-radius: var(--pg-radius);
+  animation: pgSlideIn 0.25s ease;
+}
+
+.pg-api-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--pg-warning);
+  line-height: 1.5;
+}
+
+.pg-api-notice svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.pg-api-row {
+  display: flex;
+  gap: 8px;
+}
+
+.pg-api-input {
+  flex: 1;
+  padding: 9px 14px;
+  font-size: 13px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  color: var(--pg-text);
+  background: var(--pg-surface2);
+  border: 1px solid var(--pg-border);
+  border-radius: 8px;
+  outline: none;
+  transition: var(--pg-transition);
+}
+
+.pg-api-input:focus {
+  border-color: var(--pg-primary);
+  box-shadow: 0 0 0 3px rgba(108,92,231,0.15);
+}
+
+.pg-api-input::placeholder {
+  color: #636e72;
+}
+
+.pg-api-save {
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, var(--pg-primary), #5f3dd6);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--pg-transition);
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.pg-api-save:hover { opacity: 0.88; }
+
+.pg-api-save.pg-saved {
+  background: linear-gradient(135deg, var(--pg-success), #00a381);
+}
+
+.pg-api-hint {
+  font-size: 11px;
+  color: #636e72;
+}
+
+.pg-api-hint strong {
+  color: var(--pg-text-muted);
+}
+

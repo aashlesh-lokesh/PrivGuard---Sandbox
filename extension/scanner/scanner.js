@@ -1,11 +1,10 @@
 /**
  * PrivGuard Image Scanner
  *
- * Uses Tesseract.js for local OCR to extract text and word bounding boxes
- * from uploaded images, runs the same detection patterns as the content
- * script, then draws Gaussian-blur rectangles over sensitive regions.
- *
- * All processing happens locally — nothing is uploaded.
+ * Two scan modes:
+ *   Local  — Tesseract.js OCR + regex patterns (fully offline)
+ *   NVIDIA — Tesseract.js for word positions + NVIDIA NIM vision LLM for
+ *            semantic PII detection (images sent to NVIDIA servers)
  */
 
 (function () {
@@ -29,8 +28,88 @@
   const canvasProtected = document.getElementById('canvasProtected');
   const btnDownload     = document.getElementById('btnDownload');
   const btnNewScan      = document.getElementById('btnNewScan');
+  const modeLocalBtn    = document.getElementById('modeLocal');
+  const modeNvidiaBtn   = document.getElementById('modeNvidia');
+  const apiPanel        = document.getElementById('apiPanel');
+  const apiKeyInput     = document.getElementById('apiKeyInput');
+  const btnSaveKey      = document.getElementById('btnSaveKey');
+  const apiKeyStatus    = document.getElementById('apiKeyStatus');
+  const headerSubtitle  = document.getElementById('headerSubtitle');
+  const footerNote      = document.getElementById('footerNote');
 
   const RING_CIRCUMFERENCE = 2 * Math.PI * 42; // ~263.89
+
+  /* ═══════════════════════════════════════════════════════════
+     SETTINGS
+     ═══════════════════════════════════════════════════════════ */
+  let scannerMode  = 'local';  // 'local' | 'nvidia'
+  let nvidiaApiKey = '';
+
+  async function loadSettings() {
+    try {
+      const stored = await chrome.storage.local.get(['pgScannerMode', 'pgNvidiaApiKey']);
+      scannerMode  = stored.pgScannerMode  || 'local';
+      nvidiaApiKey = stored.pgNvidiaApiKey || '';
+    } catch { /* extension context not available (e.g., opened as plain tab) */ }
+    updateSettingsUI();
+  }
+
+  async function saveSettings() {
+    try {
+      await chrome.storage.local.set({ pgScannerMode: scannerMode, pgNvidiaApiKey: nvidiaApiKey });
+    } catch { /* ignore */ }
+  }
+
+  function updateSettingsUI() {
+    const isNvidia = scannerMode === 'nvidia';
+
+    modeLocalBtn.classList.toggle('pg-mode-active', !isNvidia);
+    modeNvidiaBtn.classList.toggle('pg-mode-active',  isNvidia);
+    apiPanel.hidden = !isNvidia;
+
+    if (isNvidia) {
+      headerSubtitle.textContent = 'Nemotron PII detection — only OCR text is sent to NVIDIA (no images)';
+      footerNote.textContent = '⚠️ Nemotron mode: only the extracted text is sent to NVIDIA — your image never leaves the browser.';
+      if (nvidiaApiKey) {
+        apiKeyInput.value = nvidiaApiKey;
+        apiKeyStatus.textContent = '✅ API key saved';
+      } else {
+        apiKeyStatus.innerHTML = 'Get a free key at <strong>build.nvidia.com</strong> → API Key';
+      }
+    } else {
+      headerSubtitle.textContent = 'Detect & blur sensitive data in images — all processing is local';
+      footerNote.textContent = 'All OCR & blurring happens locally in your browser — nothing is uploaded anywhere.';
+    }
+  }
+
+  modeLocalBtn.addEventListener('click', () => {
+    scannerMode = 'local';
+    saveSettings();
+    updateSettingsUI();
+  });
+
+  modeNvidiaBtn.addEventListener('click', () => {
+    scannerMode = 'nvidia';
+    saveSettings();
+    updateSettingsUI();
+  });
+
+  btnSaveKey.addEventListener('click', () => {
+    const key = apiKeyInput.value.trim();
+    if (!key) return;
+    nvidiaApiKey = key;
+    saveSettings();
+    apiKeyStatus.textContent = '✅ API key saved';
+    btnSaveKey.textContent = 'Saved!';
+    btnSaveKey.classList.add('pg-saved');
+    setTimeout(() => {
+      btnSaveKey.textContent = 'Save';
+      btnSaveKey.classList.remove('pg-saved');
+    }, 2000);
+  });
+
+  // Allow saving with Enter
+  apiKeyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') btnSaveKey.click(); });
 
   /* ═══════════════════════════════════════════════════════════
      DETECTION PATTERNS (shared with content script)
@@ -166,20 +245,46 @@
       updateProgress(5, 'Loading image…');
       const img = await loadImage(file);
 
-      // 2 — Draw original
+      // 2 — Draw original on both canvases
       drawOnCanvas(canvasOriginal, img);
       drawOnCanvas(canvasProtected, img);
 
-      // 3 — Run OCR
+      // 3 — Tesseract OCR (always runs — provides word bounding boxes for blurring)
       updateProgress(10, 'Starting OCR engine…');
       const ocrResult = await runOCR(img);
 
-      // 4 — Match patterns against OCR words
-      updateProgress(85, 'Detecting sensitive data…');
-      const findings = detectSensitiveData(ocrResult);
+      // 4 — Detect sensitive data (branch by mode)
+      let findings;
+      if (scannerMode === 'nvidia') {
+        if (!nvidiaApiKey) {
+          throw new Error('No NVIDIA API key saved. Switch to NVIDIA Nemotron mode and save your key first.');
+        }
+        const ocrText = ocrResult.text || '';
+        if (!ocrText.trim()) {
+          throw new Error('No text found in image. Nemotron needs OCR text to analyze.');
+        }
+        updateProgress(82, 'Sending OCR text to Nemotron for PII analysis…');
+        let nemotronFindings = [];
+        try {
+          const rawFindings = await runNemotronTextScan(ocrText);
+          nemotronFindings = matchFindingsToOcrBoxes(rawFindings, ocrResult);
+          console.log('[PrivGuard] Nemotron found', nemotronFindings.length, 'items');
+        } catch (nemErr) {
+          console.warn('[PrivGuard] Nemotron call failed, falling back to local:', nemErr);
+        }
+        // Always run local regex too and merge (Nemotron may miss OCR-friendly patterns)
+        updateProgress(90, 'Running local pattern scan…');
+        const localFindings = detectSensitiveData(ocrResult);
+        console.log('[PrivGuard] Local regex found', localFindings.length, 'items');
+        // Merge: Nemotron first, then local findings that don't overlap
+        findings = mergeFindings(nemotronFindings, localFindings);
+      } else {
+        updateProgress(85, 'Detecting sensitive data…');
+        findings = detectSensitiveData(ocrResult);
+      }
 
       // 5 — Blur sensitive regions on canvas
-      updateProgress(92, 'Applying blur protection…');
+      updateProgress(95, 'Applying blur protection…');
       if (findings.length > 0) {
         blurSensitiveRegions(canvasProtected, img, findings);
       }
@@ -254,8 +359,197 @@
   }
 
   /* ═══════════════════════════════════════════════════════════
-     SENSITIVE DATA DETECTION
+     NVIDIA NIM — NEMOTRON TEXT API
+     Model: nvidia/llama-3.3-nemotron-super-49b-v1
+     Only OCR-extracted text is sent to NVIDIA (not the image).
+     Tesseract provides word bounding boxes for blurring.
      ═══════════════════════════════════════════════════════════ */
+
+  const NVIDIA_API_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
+  const NVIDIA_MODEL   = 'nvidia/llama-3.3-nemotron-super-49b-v1';
+
+  const NVIDIA_PROMPT = `You are PrivGuard, a PII detection system. Analyze the user-provided text (extracted via OCR from an image) and identify every piece of sensitive or personally identifiable information.
+
+Detect these types:
+- Credit/debit card numbers, CVV, expiry dates
+- Bank account numbers, IBAN, SWIFT/BIC codes
+- SSN, Aadhaar numbers, national IDs, passport numbers
+- Phone numbers, email addresses, physical addresses
+- Passwords, PINs, OTPs, security codes
+- API keys, access tokens, private keys, credentials
+- Medical record numbers, health insurance IDs
+- Driver's license numbers, vehicle registration numbers
+- Dates of birth, tax IDs, financial account numbers
+
+Return the exact text as it appears in the input — do not correct OCR errors.
+
+Severity: CRITICAL (SSN, Aadhaar, card numbers, passwords, keys), HIGH (IBAN, bank accounts, OTP, medical IDs), MEDIUM (phone, email, address), LOW (names, generic contact info).
+
+Respond with ONLY a JSON array, no other text:
+[{"label":"<type>","value":"<exact text>","severity":"<CRITICAL|HIGH|MEDIUM|LOW>"}]
+
+If nothing found, respond: []`;
+
+  async function runNemotronTextScan(ocrText) {
+    const response = await fetch(NVIDIA_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${nvidiaApiKey}`,
+      },
+      body: JSON.stringify({
+        model: NVIDIA_MODEL,
+        messages: [
+          { role: 'system', content: NVIDIA_PROMPT },
+          { role: 'user',   content: ocrText },
+        ],
+        max_tokens: 2048,
+        temperature: 0.1,
+      }),
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '');
+      if (response.status === 401) throw new Error('Invalid NVIDIA API key. Check your key in the settings above.');
+      if (response.status === 402) throw new Error('NVIDIA API credits exhausted. Add credits at build.nvidia.com.');
+      if (response.status === 429) throw new Error('NVIDIA API rate limit reached. Please wait a moment and try again.');
+      let detail = '';
+      try { detail = JSON.parse(errBody).detail || errBody.slice(0, 200); } catch { detail = errBody.slice(0, 200); }
+      throw new Error(`NVIDIA API error ${response.status}: ${detail}`);
+    }
+
+    const data = await response.json();
+    const finishReason = data.choices?.[0]?.finish_reason;
+    let content = data.choices?.[0]?.message?.content || '';
+
+    console.log('[PrivGuard] Nemotron finish_reason:', finishReason);
+    console.log('[PrivGuard] Nemotron raw response length:', content.length);
+    console.log('[PrivGuard] Nemotron raw response (first 500 chars):', content.slice(0, 500));
+
+    if (finishReason === 'length') {
+      console.warn('[PrivGuard] Nemotron response was truncated (max_tokens reached)');
+    }
+
+    // Nemotron Ultra wraps reasoning in <think>…</think>.
+    // Handle both closed tags AND unclosed (truncated) think blocks.
+    content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    // If <think> was never closed (truncated), strip everything from <think> onward
+    content = content.replace(/<think>[\s\S]*/gi, '').trim();
+
+    // Strip markdown code fences: ```json … ```
+    content = content.replace(/```(?:json)?\s*/gi, '').replace(/```/g, '').trim();
+
+    console.log('[PrivGuard] Nemotron cleaned content:', content.slice(0, 500));
+
+    if (!content) {
+      console.warn('[PrivGuard] Nemotron response was empty after stripping think blocks');
+      return [];
+    }
+
+    // Extract JSON array from whatever remains
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.warn('[PrivGuard] No JSON array in Nemotron response:', content.slice(0, 500));
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(jsonMatch[0]);
+      console.log('[PrivGuard] Nemotron parsed findings:', parsed.length, parsed);
+      return parsed;
+    } catch (e) {
+      console.warn('[PrivGuard] JSON parse error:', e.message, '| content:', jsonMatch[0].slice(0, 300));
+      return [];
+    }
+  }
+
+  /**
+   * Merge Nemotron findings (which have boxes from matchFindingsToOcrBoxes)
+   * with local regex findings, deduplicating by overlapping boxes/values.
+   */
+  function mergeFindings(nemotronFindings, localFindings) {
+    const merged = [...nemotronFindings];
+    for (const lf of localFindings) {
+      // Check if any Nemotron finding already covers this value
+      const isDuplicate = merged.some(nf => {
+        if (!nf.value || !lf.value) return false;
+        const nv = nf.value.replace(/[\s\-]/g, '').toLowerCase();
+        const lv = lf.value.replace(/[\s\-]/g, '').toLowerCase();
+        return nv.includes(lv) || lv.includes(nv);
+      });
+      if (!isDuplicate) merged.push(lf);
+    }
+    return merged;
+  }
+
+  /**
+   * Match NVIDIA's text-based findings to OCR word bounding boxes.
+   * Strategy:
+   *   1. Exact substring match in OCR text (case-insensitive)
+   *   2. Normalized match (strip spaces & dashes) — handles "4532 1234" vs "43321234"
+   * Words whose positions overlap the matched range supply the blur boxes.
+   */
+  function matchFindingsToOcrBoxes(nvidiaFindings, ocrData) {
+    return nvidiaFindings
+      .filter(f => f && f.value)
+      .map((f, idx) => {
+        const value    = String(f.value).trim();
+        const severity = ['CRITICAL','HIGH','MEDIUM','LOW'].includes(f.severity)
+          ? f.severity : 'HIGH';
+        const boxes = findTextBoxesInOcr(value, ocrData);
+        console.log(`[PrivGuard] Matching "${value}" → ${boxes.length} boxes found`);
+        return {
+          id:         `nvidia_${idx}_${value.slice(0, 10).replace(/\s/g, '')}`,
+          label:      f.label || 'Sensitive Data',
+          severity,
+          confidence: 0.95,
+          value,
+          boxes,
+        };
+      });
+  }
+
+  /**
+   * Find a value string within the OCR data and return matching word boxes.
+   * Returns [] if the value can't be located (e.g., OCR misread it).
+   */
+  function findTextBoxesInOcr(value, ocrData) {
+    if (!value || !ocrData.text) return [];
+    const fullText = ocrData.text;
+
+    // ── Attempt 1: direct case-insensitive substring match ──
+    const lcText  = fullText.toLowerCase();
+    const lcValue = value.toLowerCase().trim();
+    let idx = lcText.indexOf(lcValue);
+    if (idx !== -1) {
+      return getWordBoxesForRange(ocrData, idx, idx + lcValue.length);
+    }
+
+    // ── Attempt 2: normalized match (strip spaces, dashes, dots) ──
+    // Build two parallel arrays: normalised chars and their original indices
+    const origIndices = [];
+    const normChars   = [];
+    for (let i = 0; i < fullText.length; i++) {
+      const c = fullText[i].toLowerCase();
+      if (!/[\s\-.]/.test(c)) {
+        origIndices.push(i);
+        normChars.push(c);
+      }
+    }
+    const compactText  = normChars.join('');
+    const compactValue = lcValue.replace(/[\s\-.]/g, '');
+
+    const ci = compactText.indexOf(compactValue);
+    if (ci !== -1 && compactValue.length > 0) {
+      const origStart = origIndices[ci];
+      const origEnd   = origIndices[ci + compactValue.length - 1] + 1;
+      return getWordBoxesForRange(ocrData, origStart, origEnd);
+    }
+
+    // Value not locatable in OCR output (OCR may have mis-read it)
+    return [];
+  }
+
 
   function detectSensitiveData(ocrData) {
     const fullText = ocrData.text || '';
@@ -451,5 +745,10 @@
   function truncate(str, max) {
     return str.length > max ? str.slice(0, max) + '…' : str;
   }
+
+  /* ═══════════════════════════════════════════════════════════
+     INIT
+     ═══════════════════════════════════════════════════════════ */
+  loadSettings();
 
 })();

@@ -34,6 +34,9 @@
   "background": {
     "service_worker": "background/background.js"
   },
+  "host_permissions": [
+    "https://integrate.api.nvidia.com/*"
+  ],
   "web_accessible_resources": [
     {
       "resources": ["engine/*.js", "lib/*"],

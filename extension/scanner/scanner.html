@@ -22,11 +22,48 @@
       </svg>
       <span class="pg-title">PrivGuard Image Scanner</span>
     </div>
-    <span class="pg-subtitle">Detect &amp; blur sensitive data in images — all processing is local</span>
+    <span class="pg-subtitle" id="headerSubtitle">Detect &amp; blur sensitive data in images</span>
   </header>
 
   <!-- ─── Main Content ──────────────────────────────────── -->
   <main class="pg-main">
+
+    <!-- Scan Mode Selector -->
+    <section class="pg-mode-section">
+      <div class="pg-mode-pills">
+        <button class="pg-mode-pill pg-mode-active" id="modeLocal">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+          Local (Tesseract)
+        </button>
+        <button class="pg-mode-pill" id="modeNvidia">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          NVIDIA Nemotron
+        </button>
+      </div>
+
+      <!-- NVIDIA API Key Panel -->
+      <div class="pg-api-panel" id="apiPanel" hidden>
+        <div class="pg-api-notice">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Only OCR-extracted text is sent to NVIDIA for analysis — your image never leaves the browser.
+        </div>
+        <div class="pg-api-row">
+          <input type="password" id="apiKeyInput" class="pg-api-input" placeholder="Paste your NVIDIA NIM API key…" autocomplete="off" spellcheck="false">
+          <button class="pg-api-save" id="btnSaveKey">Save</button>
+        </div>
+        <div class="pg-api-hint" id="apiKeyStatus">Get a free key at <strong>build.nvidia.com</strong> → API Key</div>
+      </div>
+    </section>
 
     <!-- Upload Zone -->
     <section class="pg-upload-zone" id="uploadZone">
@@ -111,7 +148,7 @@
 
   <!-- ─── Footer ────────────────────────────────────────── -->
   <footer class="pg-footer">
-    <span>All OCR &amp; blurring happens locally in your browser — nothing is uploaded anywhere.</span>
+    <span id="footerNote">All OCR &amp; blurring happens locally in your browser — nothing is uploaded anywhere.</span>
   </footer>
 
   <script src="../lib/tesseract.min.js"></script>
